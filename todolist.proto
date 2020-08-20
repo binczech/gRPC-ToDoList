@@ -11,7 +11,7 @@ service ToDoListManager {
 }
 
 message RequestListMessage {
-    string text = 1;
+    string Text = 1;
 }
 
 message ToDoMessage {
@@ -24,14 +24,14 @@ message ListToDosMessage {
 }
 
 message AddToDoMessage {
-    string text = 1;
+    string Text = 1;
 }
 
 message UpdateToDoMessage {
-    int32 id = 1;
-    string text = 2;
+    string Id = 1;
+    string Text = 2;
 }
 
 message DeleteToDoMessage {
-    int32 id = 1;
+    string Id = 1;
 }

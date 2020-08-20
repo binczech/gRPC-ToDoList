@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 
@@ -53,10 +52,8 @@ func GetList(client *firestore.Client, ctx context.Context) (ToDosList []*pb.ToD
 			log.Fatalf("Failed to iterate: %v", err)
 		}
 		fetchedData.Id = doc.Ref.ID
-		fmt.Println(fetchedData)
 		ToDosList = append(ToDosList, fetchedData)
 	}
-	fmt.Println(ToDosList)
 	return ToDosList
 }
 
@@ -64,7 +61,15 @@ func SetList(client *firestore.Client, ctx context.Context, in *pb.AddToDoMessag
 	ref := client.Collection("todolist").NewDoc()
 	_, err := ref.Set(ctx, in)
 	if err != nil {
-		// Handle any errors in an appropriate way, such as returning them.
+		log.Printf("An error has occurred: %s", err)
+	}
+}
+
+func DeleteFromList(client *firestore.Client, ctx context.Context, id string) {
+	ref := client.Collection("todolist")
+	toDelete := ref.Doc(id)
+	_, err := toDelete.Delete(ctx)
+	if err != nil {
 		log.Printf("An error has occurred: %s", err)
 	}
 }
@@ -80,6 +85,14 @@ func (s *server) ListToDos(ctx context.Context, in *pb.RequestListMessage) (*pb.
 func (s *server) AddToDo(ctx context.Context, in *pb.AddToDoMessage) (*pb.ListToDosMessage, error) {
 	client := Connect(ctx)
 	SetList(client, ctx, in)
+	ToDosList := GetList(client, ctx)
+	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
+}
+
+func (s *server) DeleteToDo(ctx context.Context, in *pb.DeleteToDoMessage) (*pb.ListToDosMessage, error) {
+	client := Connect(ctx)
+	idToDelete := in.GetId()
+	DeleteFromList(client, ctx, idToDelete)
 	ToDosList := GetList(client, ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }
