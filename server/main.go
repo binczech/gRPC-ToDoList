@@ -74,6 +74,19 @@ func DeleteFromList(client *firestore.Client, ctx context.Context, id string) {
 	}
 }
 
+func UpdateInList(client *firestore.Client, ctx context.Context, in *pb.UpdateToDoMessage) {
+	idToUpdate := in.GetId()
+	text := in.GetText()
+	ref := client.Collection("todolist")
+	toUpdate := ref.Doc(idToUpdate)
+	_, err := toUpdate.Set(ctx, &pb.UpdateToDoMessage{
+		Text: text,
+	})
+	if err != nil {
+		log.Printf("An error has occurred: %s", err)
+	}
+}
+
 func (s *server) ListToDos(ctx context.Context, in *pb.RequestListMessage) (*pb.ListToDosMessage, error) {
 	// Use the application default credentials
 	client := Connect(ctx)
@@ -93,6 +106,13 @@ func (s *server) DeleteToDo(ctx context.Context, in *pb.DeleteToDoMessage) (*pb.
 	client := Connect(ctx)
 	idToDelete := in.GetId()
 	DeleteFromList(client, ctx, idToDelete)
+	ToDosList := GetList(client, ctx)
+	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
+}
+
+func (s *server) UpdateToDo(ctx context.Context, in *pb.UpdateToDoMessage) (*pb.ListToDosMessage, error) {
+	client := Connect(ctx)
+	UpdateInList(client, ctx, in)
 	ToDosList := GetList(client, ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }

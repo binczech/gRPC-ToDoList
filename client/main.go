@@ -32,13 +32,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not greet: %v", err)
 	}
+	log.Printf("List ToDos after Add: %s", r.GetToDosList())
 	ToDosList := r.GetToDosList()
-	log.Printf("List ToDos after Add: %s", ToDosList)
-
+	var ToDoID string
 	for _, ToDo := range ToDosList {
 		if ToDo.Text == "New ToDo" {
-			r, err = c.DeleteToDo(ctx, &pb.DeleteToDoMessage{Id: ToDo.Id})
+			ToDoID = ToDo.Id
 		}
 	}
+	r, err = c.UpdateToDo(ctx, &pb.UpdateToDoMessage{Id: ToDoID, Text: "Updated ToDo"})
+	if err != nil {
+		log.Fatalf("could not greet: %v", err)
+	}
+	log.Printf("List ToDos after Update: %s", r.GetToDosList())
+	r, err = c.DeleteToDo(ctx, &pb.DeleteToDoMessage{Id: ToDoID})
 	log.Printf("List of ToDos after Delete: %s", r.GetToDosList())
 }
