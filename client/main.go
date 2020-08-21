@@ -45,6 +45,11 @@ func main() {
 		log.Fatalf("could not greet: %v", err)
 	}
 	log.Printf("List ToDos after Update: %s", r.GetToDosList())
+	s, err := c.ReadToDo(ctx, &pb.RequestReadMessage{Id: ToDoID})
+	if err != nil {
+		log.Fatalf("could not greet: %v", err)
+	}
+	log.Printf("List of ToDos after Read: %s", s.GetText())
 	r, err = c.DeleteToDo(ctx, &pb.DeleteToDoMessage{Id: ToDoID})
 	log.Printf("List of ToDos after Delete: %s", r.GetToDosList())
 }

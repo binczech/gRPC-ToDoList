@@ -4,6 +4,7 @@ package todolist;
 option go_package = ".;todolist";
 
 service ToDoListManager {
+    rpc ReadToDo (RequestReadMessage) returns (ToDoMessage);
     rpc ListToDos (RequestListMessage) returns (ListToDosMessage);
     rpc AddToDo (AddToDoMessage) returns (ListToDosMessage);
     rpc UpdateToDo (UpdateToDoMessage) returns (ListToDosMessage);
@@ -12,6 +13,10 @@ service ToDoListManager {
 
 message RequestListMessage {
     string Text = 1;
+}
+
+message RequestReadMessage {
+    string Id = 1;
 }
 
 message ToDoMessage {

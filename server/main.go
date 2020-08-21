@@ -74,17 +74,35 @@ func DeleteFromList(client *firestore.Client, ctx context.Context, id string) {
 	}
 }
 
+func GetOneDoc(client *firestore.Client, id string) (ToDo *firestore.DocumentRef) {
+	ref := client.Collection("todolist")
+	ToDo = ref.Doc(id)
+	return ToDo
+}
+
 func UpdateInList(client *firestore.Client, ctx context.Context, in *pb.UpdateToDoMessage) {
 	idToUpdate := in.GetId()
 	text := in.GetText()
-	ref := client.Collection("todolist")
-	toUpdate := ref.Doc(idToUpdate)
+	toUpdate := GetOneDoc(client, idToUpdate)
 	_, err := toUpdate.Set(ctx, &pb.UpdateToDoMessage{
 		Text: text,
 	})
 	if err != nil {
 		log.Printf("An error has occurred: %s", err)
 	}
+}
+
+func (s *server) ReadToDo(ctx context.Context, in *pb.RequestReadMessage) (*pb.ToDoMessage, error) {
+	client := Connect(ctx)
+	defer client.Close()
+	idToRead := in.GetId()
+	toRead := GetOneDoc(client, idToRead)
+	docsnap, err := toRead.Get(ctx)
+	if err != nil {
+		log.Printf("An error has occurred: %s", err)
+	}
+	dataMap := docsnap.Data()
+	return &pb.ToDoMessage{Id: dataMap["Id"].(string), Text: dataMap["Text"].(string)}, nil
 }
 
 func (s *server) ListToDos(ctx context.Context, in *pb.RequestListMessage) (*pb.ListToDosMessage, error) {
