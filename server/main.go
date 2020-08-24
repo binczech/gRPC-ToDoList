@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"os"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -14,16 +15,13 @@ import (
 	firebase "firebase.google.com/go"
 )
 
-const (
-	port = ":50051"
-)
-
 type server struct {
+	Client *firestore.Client
 	pb.UnimplementedToDoListManagerServer
 }
 
-func Connect(ctx context.Context) (client *firestore.Client) {
-	ctx = context.Background()
+func connect() (client *firestore.Client) {
+	ctx := context.Background()
 	conf := &firebase.Config{ProjectID: "binczech-test"}
 	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
@@ -37,8 +35,8 @@ func Connect(ctx context.Context) (client *firestore.Client) {
 	return client
 }
 
-func GetList(client *firestore.Client, ctx context.Context) (ToDosList []*pb.ToDoMessage) {
-	iter := client.Collection("todolist").Documents(ctx)
+func (s *server) getList(ctx context.Context) (ToDosList []*pb.ToDoMessage) {
+	iter := s.Client.Collection("todolist").Documents(ctx)
 	for {
 		var fetchedData *pb.ToDoMessage
 		doc, err := iter.Next()
@@ -46,10 +44,10 @@ func GetList(client *firestore.Client, ctx context.Context) (ToDosList []*pb.ToD
 			break
 		}
 		if err != nil {
-			log.Fatalf("Failed to iterate: %v", err)
+			log.Printf("Failed to iterate: %v", err)
 		}
 		if err := doc.DataTo(&fetchedData); err != nil {
-			log.Fatalf("Failed to iterate: %v", err)
+			log.Printf("Failed to iterate: %v", err)
 		}
 		fetchedData.Id = doc.Ref.ID
 		ToDosList = append(ToDosList, fetchedData)
@@ -57,16 +55,16 @@ func GetList(client *firestore.Client, ctx context.Context) (ToDosList []*pb.ToD
 	return ToDosList
 }
 
-func SetList(client *firestore.Client, ctx context.Context, in *pb.AddToDoMessage) {
-	ref := client.Collection("todolist").NewDoc()
+func (s *server) setList(ctx context.Context, in *pb.AddToDoMessage) {
+	ref := s.Client.Collection("todolist").NewDoc()
 	_, err := ref.Set(ctx, in)
 	if err != nil {
 		log.Printf("An error has occurred: %s", err)
 	}
 }
 
-func DeleteFromList(client *firestore.Client, ctx context.Context, id string) {
-	ref := client.Collection("todolist")
+func (s *server) deleteFromList(ctx context.Context, id string) {
+	ref := s.Client.Collection("todolist")
 	toDelete := ref.Doc(id)
 	_, err := toDelete.Delete(ctx)
 	if err != nil {
@@ -74,16 +72,16 @@ func DeleteFromList(client *firestore.Client, ctx context.Context, id string) {
 	}
 }
 
-func GetOneDoc(client *firestore.Client, id string) (ToDo *firestore.DocumentRef) {
-	ref := client.Collection("todolist")
+func (s *server) getOneDoc(id string) (ToDo *firestore.DocumentRef) {
+	ref := s.Client.Collection("todolist")
 	ToDo = ref.Doc(id)
 	return ToDo
 }
 
-func UpdateInList(client *firestore.Client, ctx context.Context, in *pb.UpdateToDoMessage) {
+func (s *server) updateInList(ctx context.Context, in *pb.UpdateToDoMessage) {
 	idToUpdate := in.GetId()
 	text := in.GetText()
-	toUpdate := GetOneDoc(client, idToUpdate)
+	toUpdate := s.getOneDoc(idToUpdate)
 	_, err := toUpdate.Set(ctx, &pb.UpdateToDoMessage{
 		Text: text,
 	})
@@ -93,10 +91,8 @@ func UpdateInList(client *firestore.Client, ctx context.Context, in *pb.UpdateTo
 }
 
 func (s *server) ReadToDo(ctx context.Context, in *pb.RequestReadMessage) (*pb.ToDoMessage, error) {
-	client := Connect(ctx)
-	defer client.Close()
 	idToRead := in.GetId()
-	toRead := GetOneDoc(client, idToRead)
+	toRead := s.getOneDoc(idToRead)
 	docsnap, err := toRead.Get(ctx)
 	if err != nil {
 		log.Printf("An error has occurred: %s", err)
@@ -107,41 +103,43 @@ func (s *server) ReadToDo(ctx context.Context, in *pb.RequestReadMessage) (*pb.T
 
 func (s *server) ListToDos(ctx context.Context, in *pb.RequestListMessage) (*pb.ListToDosMessage, error) {
 	// Use the application default credentials
-	client := Connect(ctx)
-	defer client.Close()
-	ToDosList := GetList(client, ctx)
+	ToDosList := s.getList(ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }
 
 func (s *server) AddToDo(ctx context.Context, in *pb.AddToDoMessage) (*pb.ListToDosMessage, error) {
-	client := Connect(ctx)
-	SetList(client, ctx, in)
-	ToDosList := GetList(client, ctx)
+	s.setList(ctx, in)
+	ToDosList := s.getList(ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }
 
 func (s *server) DeleteToDo(ctx context.Context, in *pb.DeleteToDoMessage) (*pb.ListToDosMessage, error) {
-	client := Connect(ctx)
 	idToDelete := in.GetId()
-	DeleteFromList(client, ctx, idToDelete)
-	ToDosList := GetList(client, ctx)
+	s.deleteFromList(ctx, idToDelete)
+	ToDosList := s.getList(ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }
 
 func (s *server) UpdateToDo(ctx context.Context, in *pb.UpdateToDoMessage) (*pb.ListToDosMessage, error) {
-	client := Connect(ctx)
-	UpdateInList(client, ctx, in)
-	ToDosList := GetList(client, ctx)
+	s.updateInList(ctx, in)
+	ToDosList := s.getList(ctx)
 	return &pb.ListToDosMessage{ToDosList: ToDosList}, nil
 }
 
 func main() {
-	lis, err := net.Listen("tcp", port)
+	port, exists := os.LookupEnv("PORT")
+	if !exists {
+		port = "1234"
+	}
+	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	pb.RegisterToDoListManagerServer(s, &server{})
+	server := server{Client: connect()}
+	defer server.Client.Close()
+	pb.RegisterToDoListManagerServer(s, &server)
+	log.Printf("Listening on %v", port)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

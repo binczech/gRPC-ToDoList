@@ -3,18 +3,23 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 	pb "todolist"
 
 	"google.golang.org/grpc"
 )
 
-const (
-	address = "localhost:50051"
-)
-
 func main() {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	port, exists := os.LookupEnv("PORT")
+	if !exists {
+		port = "1234"
+	}
+	address, exists := os.LookupEnv("ADDR")
+	if !exists {
+		address = "localhost"
+	}
+	conn, err := grpc.Dial(address+":"+port, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
